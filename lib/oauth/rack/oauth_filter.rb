@@ -26,9 +26,7 @@ module OAuth
         env["oauth_plugin"]=true
         strategies = []
         if token_string = oauth2_token(request)
-          puts "Token string: " + token_string
           token = Oauth2Token.where(:token => token_string).first if token_string
-          puts "Token: " + token
           if token
             env["oauth.token"] = token
             env["oauth.version"] = 2
@@ -95,14 +93,9 @@ module OAuth
       end
 
       def oauth2_token(request)
-        puts request.params["oauth_token"]
-        puts request.env["HTTP_AUTHORIZATION"]
-        
         if request.params["oauth_token"]
           return request.params["oauth_token"]
         end
-        
-
         
         request.params["oauth_token"] ||
           request.env["HTTP_AUTHORIZATION"] &&
