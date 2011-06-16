@@ -26,7 +26,9 @@ module OAuth
         env["oauth_plugin"]=true
         strategies = []
         if token_string = oauth2_token(request)
-          token = Oauth2Token.find_by_token(token_string) if token_string
+          puts "Token string: " + token_string
+          token = Oauth2Token.where(:token => token_string).first if token_string
+          puts "Token: " + token
           if token
             env["oauth.token"] = token
             env["oauth.version"] = 2
@@ -35,17 +37,22 @@ module OAuth
           end
 
         elsif oauth1_verify(request) do |request_proxy|
-            client_application = ClientApplication.find_by_key(request_proxy.consumer_key)
+            puts "verified"
+            client_application = ClientApplication.where(:key => request_proxy.consumer_key).first
             env["oauth.client_application_candidate"] = client_application
             # Store this temporarily in client_application object for use in request token generation
             client_application.token_callback_url=request_proxy.oauth_callback if request_proxy.oauth_callback
-
+            
             oauth_token = nil
             
             if request_proxy.token
-              oauth_token = client_application.tokens.first(:conditions=>{:token => request_proxy.token})
+              oauth_token = client_application.tokens.where(:token => request_proxy.token).first
+              puts "Oauth_token = " + oauth_token.to_s
+              
               if oauth_token.respond_to?(:provided_oauth_verifier=)
                 oauth_token.provided_oauth_verifier=request_proxy.oauth_verifier 
+                puts "Oauth_verifier = " + oauth_token.provided_oauth_verifier
+                
               end
               env["oauth.token_candidate"] = oauth_token
             end
@@ -68,7 +75,9 @@ module OAuth
           env["oauth.version"] = 1
 
         end
+
         env["oauth.strategies"] = strategies unless strategies.empty?
+        
         env["oauth.client_application_candidate"] = nil
         env["oauth.token_candidate"] = nil
         @app.call(env)
@@ -86,6 +95,15 @@ module OAuth
       end
 
       def oauth2_token(request)
+        puts request.params["oauth_token"]
+        puts request.env["HTTP_AUTHORIZATION"]
+        
+        if request.params["oauth_token"]
+          return request.params["oauth_token"]
+        end
+        
+
+        
         request.params["oauth_token"] ||
           request.env["HTTP_AUTHORIZATION"] &&
             request.env["HTTP_AUTHORIZATION"][/^(OAuth|Token) ([^\s]*)$/] && $2
