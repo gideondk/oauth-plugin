@@ -93,6 +93,7 @@ module OAuth
           value
         rescue OAuth::Signature::UnknownSignatureMethod => e
           puts "Unknown Signature method"
+          puts "ERROR"+ e.to_s
           false
         end
       end
