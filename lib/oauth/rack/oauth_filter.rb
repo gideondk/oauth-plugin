@@ -15,13 +15,16 @@ module OAuth
     # config.middleware.use OAuth::Rack::OAuthFilter
     
     
-    
     class OAuthFilter
       def initialize(app)
         @app = app
       end
       
-      def call(env)        
+      def call(env)
+        puts "\n***************************\n"        
+        puts env
+        puts "\n***************************\n"        
+        puts env["HTTP_AUTHORIZATION"]
         request = ::Rack::Request.new(env)
         env["oauth_plugin"]=true
         strategies = []
@@ -84,10 +87,12 @@ module OAuth
       def oauth1_verify(request, options = {}, &block)
         begin 
           signature = OAuth::Signature.build(request, options, &block)
+          puts signature
           return false unless OauthNonce.remember(signature.request.nonce, signature.request.timestamp)
           value = signature.verify
           value
         rescue OAuth::Signature::UnknownSignatureMethod => e
+          puts "Unknown Signature method"
           false
         end
       end
