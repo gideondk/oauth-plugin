@@ -21,10 +21,6 @@ module OAuth
       end
       
       def call(env)
-        puts "\n***************************\n"        
-        puts env
-        puts "\n***************************\n"        
-        puts env["HTTP_AUTHORIZATION"]
         request = ::Rack::Request.new(env)
         env["oauth_plugin"]=true
         strategies = []
@@ -38,7 +34,6 @@ module OAuth
           end
 
         elsif oauth1_verify(request) do |request_proxy|
-            puts "verified"
             client_application = ClientApplication.where(:key => request_proxy.consumer_key).first
             env["oauth.client_application_candidate"] = client_application
             # Store this temporarily in client_application object for use in request token generation
@@ -48,8 +43,7 @@ module OAuth
             
             if request_proxy.token
               oauth_token = client_application.tokens.where(:token => request_proxy.token).first
-              puts "Oauth_token = " + oauth_token.to_s
-              
+
               if oauth_token.respond_to?(:provided_oauth_verifier=)
                 oauth_token.provided_oauth_verifier=request_proxy.oauth_verifier 
                 puts "Oauth_verifier = " + oauth_token.provided_oauth_verifier
@@ -87,13 +81,10 @@ module OAuth
       def oauth1_verify(request, options = {}, &block)
         begin 
           signature = OAuth::Signature.build(request, options, &block)
-          puts signature
           return false unless OauthNonce.remember(signature.request.nonce, signature.request.timestamp)
           value = signature.verify
           value
         rescue OAuth::Signature::UnknownSignatureMethod => e
-          puts "Unknown Signature method"
-          puts "ERROR"+ e.to_s
           false
         end
       end

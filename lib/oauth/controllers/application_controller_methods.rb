@@ -41,9 +41,6 @@ module OAuth
         end
         
         def allow?
-          puts "Strategies: " + @strategies.to_s
-          puts "Env: " + env["oauth.strategies"].to_s
-          
           if @strategies.include?(:interactive) && interactive
             true
           elsif !(@strategies & env["oauth.strategies"].to_a).empty?
