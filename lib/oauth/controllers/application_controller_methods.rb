@@ -40,7 +40,7 @@ module OAuth
           @strategies = strategies
         end
         
-        def allow?
+        def allow?          
           if @strategies.include?(:interactive) && interactive
             true
           elsif !(@strategies & env["oauth.strategies"].to_a).empty?

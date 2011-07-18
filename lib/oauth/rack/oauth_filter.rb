@@ -5,7 +5,7 @@ require "oauth/request_proxy/rack_request"
 
 module OAuth
   module Rack
-    
+
     # An OAuth 1.0a filter to be used together with the oauth-plugin for rails.T
     # This is still experimental
     #
@@ -13,78 +13,83 @@ module OAuth
     #
     # require 'oauth/rack/oauth_filter'
     # config.middleware.use OAuth::Rack::OAuthFilter
-    
-    
+
+
     class OAuthFilter
       def initialize(app)
         @app = app
       end
-      
+
       def call(env)
         request = ::Rack::Request.new(env)
         env["oauth_plugin"]=true
         strategies = []
+
+        # If it's a oAuth2 token
         if token_string = oauth2_token(request)
           token = Oauth2Token.where(:token => token_string).first if token_string
           if token
             env["oauth.token"] = token
             env["oauth.version"] = 2
             strategies << :oauth20_token
-            strategies << :token            
+            strategies << :token
           end
 
+          # Else, we have a oAuth 1 token...
         elsif oauth1_verify(request) do |request_proxy|
             client_application = ClientApplication.where(:key => request_proxy.consumer_key).first
             env["oauth.client_application_candidate"] = client_application
             # Store this temporarily in client_application object for use in request token generation
             client_application.token_callback_url=request_proxy.oauth_callback if request_proxy.oauth_callback
-            
+
             oauth_token = nil
-            
+
             if request_proxy.token
               oauth_token = client_application.tokens.where(:token => request_proxy.token).first
 
               if oauth_token.respond_to?(:provided_oauth_verifier=)
-                oauth_token.provided_oauth_verifier=request_proxy.oauth_verifier 
-                puts "Oauth_verifier = " + oauth_token.provided_oauth_verifier
-                
+                oauth_token.provided_oauth_verifier=request_proxy.oauth_verifier
               end
+
               env["oauth.token_candidate"] = oauth_token
             end
+            if env["oauth.token_candidate"]
+              env["oauth.token"] = env["oauth.token_candidate"]
+              strategies << :oauth10_token
+              if env["oauth.token"].is_a?(::RequestToken)
+                strategies << :oauth10_request_token
+              elsif env["oauth.token"].is_a?(::AccessToken)
+                strategies << :token
+                strategies << :oauth10_access_token
+              end
+            else
+              strategies << :two_legged
+            end
+
+            env["oauth.client_application"] = env["oauth.client_application_candidate"]
+            env["oauth.version"] = 1
+
             # return the token secret and the consumer secret
             [(oauth_token.nil? ? nil : oauth_token.secret), (client_application.nil? ? nil : client_application.secret)]
-        end
-          if env["oauth.token_candidate"]
-            env["oauth.token"] = env["oauth.token_candidate"]
-            strategies << :oauth10_token
-            if env["oauth.token"].is_a?(::RequestToken)
-              strategies << :oauth10_request_token
-            elsif env["oauth.token"].is_a?(::AccessToken)
-              strategies << :token
-              strategies << :oauth10_access_token
-            end
-          else
-            strategies << :two_legged
-          end
-          env["oauth.client_application"] = env["oauth.client_application_candidate"]
-          env["oauth.version"] = 1
-
+          end          
         end
 
         env["oauth.strategies"] = strategies unless strategies.empty?
-        
+
         env["oauth.client_application_candidate"] = nil
         env["oauth.token_candidate"] = nil
         @app.call(env)
       end
 
       def oauth1_verify(request, options = {}, &block)
-        begin 
+        begin
           signature = OAuth::Signature.build(request, options, &block)
           return false unless OauthNonce.remember(signature.request.nonce, signature.request.timestamp)
           value = signature.verify
           value
         rescue OAuth::Signature::UnknownSignatureMethod => e
+          puts "Unknown Signature method"
+          puts "ERROR"+ e.to_s
           false
         end
       end
@@ -93,11 +98,11 @@ module OAuth
         if request.params["oauth_token"]
           return request.params["oauth_token"]
         end
-        
+
         request.params["oauth_token"] ||
           request.env["HTTP_AUTHORIZATION"] &&
-            request.env["HTTP_AUTHORIZATION"][/^(OAuth|Token) ([^\s]*)$/] && $2
+          request.env["HTTP_AUTHORIZATION"][/^(OAuth|Token) ([^\s]*)$/] && $2
       end
-    end      
+    end
   end
 end
