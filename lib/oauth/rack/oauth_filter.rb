@@ -24,11 +24,9 @@ module OAuth
         request = ::Rack::Request.new(env)
         env["oauth_plugin"]=true
         strategies = []
-        puts "Status: HTTP_AUTHORIZATION - \n" + request.env["HTTP_AUTHORIZATION"] + "\n"
 
         # If it's a oAuth2 token
         if token_string = oauth2_token(request)
-          puts "Status: Got a oAuth2 token"
           token = Oauth2Token.where(:token => token_string).first if token_string
           if token
             env["oauth.token"] = token
@@ -39,18 +37,14 @@ module OAuth
 
           # Else, we have a oAuth 1 token...
         elsif oauth1_verify(request) do |request_proxy|
-            puts "Status: Received oAuth1 Request"
             client_application = ClientApplication.where(:key => request_proxy.consumer_key).first
             env["oauth.client_application_candidate"] = client_application
             # Store this temporarily in client_application object for use in request token generation
             client_application.token_callback_url=request_proxy.oauth_callback if request_proxy.oauth_callback
-
-            puts "Status: Got Client Application - " + client_application.id.to_s
             oauth_token = nil
 
             if request_proxy.token
               oauth_token = client_application.tokens.where(:token => request_proxy.token).first
-              puts "Status: Got oAuth Token - " + request_proxy.token
               
               if oauth_token.respond_to?(:provided_oauth_verifier=)
                 oauth_token.provided_oauth_verifier=request_proxy.oauth_verifier
@@ -84,7 +78,6 @@ module OAuth
         env["oauth.client_application_candidate"] = nil
         env["oauth.token_candidate"] = nil
         
-        puts "Status: Using strategies - " + strategies.to_s
         @app.call(env)
       end
 
@@ -95,7 +88,6 @@ module OAuth
           value = signature.verify
           value
         rescue OAuth::Signature::UnknownSignatureMethod => e
-          puts "Error: Unknown oAuth1 signature method"
           false
         end
       end
